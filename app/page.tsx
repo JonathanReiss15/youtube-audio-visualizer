@@ -1,8 +1,6 @@
-// src/app/page.tsx
 "use client";
 import dynamic from "next/dynamic";
-import React, { useState } from "react";
-import { VisualizerState } from "./types";
+import React, { useState, useCallback } from "react";
 
 const Visualizer = dynamic(() => import("./Visualizer"), {
   ssr: false,
@@ -12,13 +10,11 @@ export default function Home() {
   const [youtubeUrl, setYoutubeUrl] = useState<string>(
     "https://www.youtube.com/watch?v=i_7bLbrbz-k"
   );
-  const [visualizerState, setVisualizerState] = useState<VisualizerState>({
-    isLoading: false,
-    error: null,
-    isPlaying: false,
-  });
 
-  const extractVideoId = (url: string): string | null => {
+  const [error, setError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+
+  const extractVideoId = useCallback((url: string): string | null => {
     try {
       const urlObj = new URL(url);
       if (urlObj.hostname.includes("youtube.com")) {
@@ -30,27 +26,25 @@ export default function Home() {
     } catch {
       return null;
     }
-  };
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const videoId = extractVideoId(youtubeUrl);
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      setIsPlaying(false);
 
-    if (!videoId) {
-      setVisualizerState({
-        isLoading: false,
-        error: "Invalid YouTube URL",
-        isPlaying: false,
-      });
-      return;
-    }
+      const videoId = extractVideoId(youtubeUrl);
 
-    setVisualizerState({
-      isLoading: true,
-      error: null,
-      isPlaying: true,
-    });
-  };
+      if (!videoId) {
+        setError("Invalid YouTube URL");
+        return;
+      }
+
+      setIsPlaying(true);
+    },
+    [youtubeUrl, extractVideoId]
+  );
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
@@ -61,10 +55,8 @@ export default function Home() {
 
         <form onSubmit={handleSubmit} className="mb-8 max-w-xl mx-auto">
           <div className="flex flex-col gap-4">
-            {visualizerState.error && (
-              <div className="text-red-500 text-sm text-center">
-                {visualizerState.error}
-              </div>
+            {error && (
+              <div className="text-red-500 text-sm text-center">{error}</div>
             )}
             <div className="flex gap-4">
               <input
@@ -76,16 +68,15 @@ export default function Home() {
               />
               <button
                 type="submit"
-                disabled={visualizerState.isLoading}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
               >
-                {visualizerState.isLoading ? "Loading..." : "Visualize"}
+                Visualize
               </button>
             </div>
           </div>
         </form>
 
-        {visualizerState.isPlaying && (
+        {isPlaying && (
           <div className="w-full aspect-[16/9] rounded-lg overflow-hidden border border-gray-800">
             <Visualizer youtubeUrl={youtubeUrl} />
           </div>
