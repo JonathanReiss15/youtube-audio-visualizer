@@ -10,7 +10,7 @@ const Visualizer = dynamic(() => import("./Visualizer"), {
 
 export default function Home() {
   const [youtubeUrl, setYoutubeUrl] = useState<string>(
-    "https://www.youtube.com/watch?v=LEyhF9Caglo"
+    "https://www.youtube.com/watch?v=i_7bLbrbz-k"
   );
   const [visualizerState, setVisualizerState] = useState<VisualizerState>({
     isLoading: false,
