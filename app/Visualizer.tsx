@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { VisualizerProps } from "./types";
 
-const PARTICLE_COUNT = 12000;
+const PARTICLE_COUNT = 60_000;
 const AUDIO_SAMPLES = 128;
 
 declare global {
