@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { VisualizerProps } from "./types";
+import { Button } from "@/components/ui/button";
+import { Play, Pause, RotateCcw } from "lucide-react";
 
-const PARTICLE_COUNT = 60_000;
+const PARTICLE_COUNT = 12000;
 const AUDIO_SAMPLES = 128;
 
 declare global {
@@ -12,11 +13,17 @@ declare global {
   }
 }
 
+interface VisualizerProps {
+  youtubeUrl: string;
+}
+
 export default function Visualizer({ youtubeUrl }: VisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<number>(0);
   const playerRef = useRef<any>(null);
   const audioDataRef = useRef<number[]>(new Array(AUDIO_SAMPLES).fill(0));
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -86,16 +93,18 @@ export default function Visualizer({ youtubeUrl }: VisualizerProps) {
       playerRef.current = new window.YT.Player("youtube-player", {
         videoId,
         playerVars: {
-          autoplay: 1,
-          controls: 1,
+          autoplay: 0,
+          controls: 0,
           modestbranding: 1,
           enablejsapi: 1,
         },
         events: {
           onReady: (event: any) => {
-            event.target.playVideo();
-            // Start updating audio data
+            setIsLoaded(true);
             updateAudioData();
+          },
+          onStateChange: (event: any) => {
+            setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
           },
         },
       });
@@ -107,24 +116,26 @@ export default function Visualizer({ youtubeUrl }: VisualizerProps) {
 
       try {
         const currentTime = playerRef.current.getCurrentTime() || 0;
+        const isCurrentlyPlaying =
+          playerRef.current.getPlayerState() === window.YT.PlayerState.PLAYING;
 
-        // Generate pseudo-audio data based on current timestamp
-        for (let i = 0; i < AUDIO_SAMPLES; i++) {
-          const frequency = i / AUDIO_SAMPLES;
-          const amplitude = Math.sin(currentTime * (frequency + 1) * 5);
-          const volume = playerRef.current.getVolume() / 100;
+        if (isCurrentlyPlaying) {
+          // Generate pseudo-audio data based on current timestamp
+          for (let i = 0; i < AUDIO_SAMPLES; i++) {
+            const frequency = i / AUDIO_SAMPLES;
+            const amplitude = Math.sin(currentTime * (frequency + 1) * 5);
+            const volume = playerRef.current.getVolume() / 100;
 
-          // Combine multiple frequencies for more interesting movement
-          audioDataRef.current[i] =
-            (Math.sin(currentTime * 2 + i * 0.1) * 0.5 + 0.5) *
-            Math.abs(amplitude) *
-            volume;
+            audioDataRef.current[i] =
+              (Math.sin(currentTime * 2 + i * 0.1) * 0.5 + 0.5) *
+              Math.abs(amplitude) *
+              volume;
+          }
         }
       } catch (e) {
         console.warn("Error updating audio data:", e);
       }
 
-      // Update roughly 60 times per second
       setTimeout(updateAudioData, 16);
     };
 
@@ -133,15 +144,12 @@ export default function Visualizer({ youtubeUrl }: VisualizerProps) {
       z: number,
       time: number
     ): number => {
-      // Map coordinates to audio sample indices
       const xIndex = Math.floor(((x + 8) / 16) * (AUDIO_SAMPLES - 1));
       const zIndex = Math.floor(((z + 8) / 16) * (AUDIO_SAMPLES - 1));
 
-      // Get audio values for both axes
       const xAudio = audioDataRef.current[Math.abs(xIndex)] || 0;
       const zAudio = audioDataRef.current[Math.abs(zIndex)] || 0;
 
-      // Combine audio data with wave movement
       return (
         (xAudio * 3 + zAudio * 3) * Math.sin(time * 0.5 + x * 0.2 + z * 0.2) +
         (xAudio + zAudio) * 4
@@ -155,7 +163,6 @@ export default function Visualizer({ youtubeUrl }: VisualizerProps) {
       const positions = geometry.attributes.position.array as Float32Array;
       const time = timeRef.current;
 
-      // Update particle positions based on visualization data
       for (let i = 0; i < positions.length; i += 3) {
         const x = positions[i];
         const z = positions[i + 2];
@@ -164,7 +171,6 @@ export default function Visualizer({ youtubeUrl }: VisualizerProps) {
 
       geometry.attributes.position.needsUpdate = true;
 
-      // Update color based on average activity
       const avgActivity =
         audioDataRef.current.reduce((a, b) => a + b, 0) /
         audioDataRef.current.length;
@@ -194,10 +200,54 @@ export default function Visualizer({ youtubeUrl }: VisualizerProps) {
     };
   }, [youtubeUrl]);
 
+  const handlePlayPause = () => {
+    if (!playerRef.current) return;
+
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+    } else {
+      playerRef.current.playVideo();
+    }
+  };
+
+  const handleRestart = () => {
+    if (!playerRef.current) return;
+    playerRef.current.seekTo(0);
+    if (!isPlaying) {
+      playerRef.current.playVideo();
+    }
+  };
+
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="absolute inset-0" />
       <div id="youtube-player" className="hidden" />
+
+      {/* Controls Overlay */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handlePlayPause}
+          disabled={!isLoaded}
+          className="bg-black/50 hover:bg-black/70 border-white/20"
+        >
+          {isPlaying ? (
+            <Pause className="h-4 w-4 text-white" />
+          ) : (
+            <Play className="h-4 w-4 text-white" />
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleRestart}
+          disabled={!isLoaded}
+          className="bg-black/50 hover:bg-black/70 border-white/20"
+        >
+          <RotateCcw className="h-4 w-4 text-white" />
+        </Button>
+      </div>
     </div>
   );
 }
